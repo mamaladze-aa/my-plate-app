@@ -34,14 +34,25 @@
   .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .cat-btn {
     display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-    padding: 12px; border-radius: 14px; border: 1.5px solid var(--border); background: #fff;
-    font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer;
-    transition: transform .1s, border-color .1s;
+    padding: 14px; border-radius: 14px; border: 1.5px solid var(--border); background: #fff;
+    font-size: 15px; font-weight: 600; color: var(--text); cursor: pointer;
+    transition: transform .1s, border-color .1s; position: relative;
   }
   .cat-btn:active { transform: scale(.97); }
   .cat-btn .unit { font-size: 11px; font-weight: 400; color: var(--muted); }
-  .cat-btn .dot { width: 10px; height: 10px; border-radius: 50%; margin-bottom: 4px; }
+  .cat-btn .dot { width: 12px; height: 12px; border-radius: 50%; margin-bottom: 4px; }
   .cat-btn.limit { border-style: dashed; }
+  .cat-btn .arrow { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 18px; }
+
+  .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sub-btn {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    padding: 14px; border-radius: 14px; border: 1.5px solid var(--border); background: #fff;
+    font-size: 15px; font-weight: 600; color: var(--text); cursor: pointer;
+    transition: transform .1s;
+  }
+  .sub-btn:active { transform: scale(.97); }
+  .sub-btn .dot { width: 10px; height: 10px; border-radius: 50%; margin-bottom: 4px; }
 
   .stepper { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 8px 0; }
   .stepper button {
@@ -64,6 +75,9 @@
   .bar-track { height: 10px; background: #eef2ef; border-radius: 6px; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 6px; transition: width .3s; }
   .bar-fill.over { background: var(--danger) !important; }
+  .sub-bar { margin-top: 4px; margin-left: 18px; }
+  .sub-bar .bar-track { height: 6px; }
+  .sub-bar .bar-label { font-size: 11px; color: var(--muted); }
 
   .fish-counter { display: flex; align-items: center; gap: 8px; font-size: 14px; }
   .fish-dots { display: flex; gap: 6px; }
@@ -105,6 +119,8 @@
     opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 30;
   }
   .toast.show { opacity: 1; }
+
+  .back-link { display: inline-block; margin-bottom: 12px; color: var(--accent); font-size: 14px; font-weight: 600; cursor: pointer; background: none; border: none; padding: 0; }
 </style>
 </head>
 <body>
@@ -118,7 +134,14 @@
     <div class="btn-grid" id="catGrid"></div>
   </div>
 
+  <div class="card" id="subCard" style="display:none;">
+    <button class="back-link" onclick="backToParents()">← Назад</button>
+    <div id="subTitle" style="font-weight:600;margin-bottom:10px;"></div>
+    <div class="sub-grid" id="subGrid"></div>
+  </div>
+
   <div class="card" id="stepperCard" style="display:none;">
+    <button class="back-link" onclick="cancelAdd()">← Назад</button>
     <div id="stepperTitle" style="text-align:center;font-weight:600;margin-bottom:4px;"></div>
     <div id="stepperUnit" style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:6px;"></div>
     <div class="stepper">
@@ -178,7 +201,7 @@
   <div class="card">
     <h2>Целевые доли (%)</h2>
     <div id="settingsGoals"></div>
-    <div style="font-size:12px;color:var(--muted);margin-top:8px;">Сумма целевых должна быть ≈ 100%. Остаток автоматически не учитывается в долях, но виден в подсказках.</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;">Сумма целевых должна быть ≈ 100%.</div>
   </div>
   <div class="card">
     <h2>Лимиты (%)</h2>
@@ -209,24 +232,63 @@
 // ============ ДАННЫЕ ============
 const DEFAULT_SETTINGS = {
   goals: [
-    { id: 'veg',    name: 'Овощи',           color: '#4CAF50', target: 25, unit: 'кулак' },
-    { id: 'greens', name: 'Зелень',          color: '#2E7D32', target: 5,  unit: 'две ладони' },
-    { id: 'fruit',  name: 'Фрукты',          color: '#8BC34A', target: 20, unit: 'горсть' },
-    { id: 'carbs',  name: 'Сложные углеводы',color: '#FF9800', target: 25, unit: 'горсть' },
-    { id: 'protein',name: 'Белок',           color: '#F44336', target: 25, unit: 'ладонь' }
+    { id: 'veg', name: 'Овощи', color: '#4CAF50', target: 25, unit: 'ладонь',
+      subs: [
+        { id: 'veg_green', name: 'Зелёные', color: '#2E7D32' },
+        { id: 'veg_red',   name: 'Красные', color: '#E53935' },
+        { id: 'veg_yellow',name: 'Жёлтые',  color: '#FBC02D' }
+      ]
+    },
+    { id: 'fruit', name: 'Фрукты', color: '#8BC34A', target: 20, unit: 'ладонь',
+      subs: [
+        { id: 'fruit_green', name: 'Зелёные', color: '#7CB342' },
+        { id: 'fruit_red',   name: 'Красные', color: '#EF5350' },
+        { id: 'fruit_yellow',name: 'Жёлтые',  color: '#FFCA28' }
+      ]
+    },
+    { id: 'protein', name: 'Белок', color: '#F44336', target: 30, unit: 'пол ладони',
+      subs: [
+        { id: 'fish',       name: 'Рыба',            color: '#2196F3', isTracker: true },
+        { id: 'lean_meat',  name: 'Нежирное мясо',   color: '#D32F2F' },
+        { id: 'lean_dairy', name: 'Нежирная молочка',color: '#90CAF9' }
+      ]
+    },
+    { id: 'carbs', name: 'Углеводы', color: '#FF9800', target: 25, unit: 'кулак',
+      subs: [
+        { id: 'legumes',  name: 'Бобовые',   color: '#8D6E63' },
+        { id: 'pasta',    name: 'Макароны',  color: '#FFB74D' },
+        { id: 'potato',   name: 'Картофель', color: '#A1887F' },
+        { id: 'bread',    name: 'Хлеб',      color: '#D7A86E' },
+        { id: 'grains',   name: 'Крупы',     color: '#FFCC80' }
+      ]
+    }
   ],
   limits: [
-    { id: 'sweet_carb', name: 'Сладкое углеводное', color: '#E91E63', target: 5, unit: 'порция' },
-    { id: 'sweet_fat',  name: 'Сладкое жировое',    color: '#9C27B0', target: 5, unit: 'порция' },
-    { id: 'dairy_fat',  name: 'Жирная молочка',     color: '#795548', target: 5, unit: 'порция' }
+    { id: 'healthy_fats', name: 'Полезные жиры', color: '#8BC34A', target: 5, unit: 'палец',
+      subs: [
+        { id: 'oil',      name: 'Масло',   color: '#9CCC65' },
+        { id: 'nuts',     name: 'Орехи',   color: '#7CB342' },
+        { id: 'avocado',  name: 'Авокадо', color: '#558B2F' }
+      ]
+    },
+    { id: 'harmful', name: 'Вредное', color: '#E91E63', target: 10, unit: 'пол ладони',
+      subs: [
+        { id: 'sweet_harmful', name: 'Сладкое', color: '#EC407A' },
+        { id: 'fat_harmful',   name: 'Жирное',  color: '#8E24AA' }
+      ]
+    }
   ],
   fishTarget: 3
 };
 
-let settings = JSON.parse(localStorage.getItem('plate_settings') || 'null') || JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+let settings = JSON.parse(localStorage.getItem('plate_settings') || 'null');
+if (!settings || !settings.goals || settings.goals[0].subs === undefined) {
+  // если старая структура — сбрасываем на новую
+  settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+}
 let entries = JSON.parse(localStorage.getItem('plate_entries') || '[]');
 let currentWindow = 3;
-let pendingCategory = null;
+let pendingPath = null; // { parent, sub }
 let pendingPortion = 1;
 
 function save() {
@@ -248,24 +310,49 @@ function showScreen(name) {
 function renderCatGrid() {
   const grid = document.getElementById('catGrid');
   grid.innerHTML = '';
-  const all = [
-    ...settings.goals.map(c => ({...c, type: 'goal'})),
-    ...settings.limits.map(c => ({...c, type: 'limit'}))
-  ];
+  const all = [...settings.goals, ...settings.limits];
   all.forEach(cat => {
     const btn = document.createElement('button');
-    btn.className = 'cat-btn' + (cat.type === 'limit' ? ' limit' : '');
-    btn.innerHTML = `<span class="dot" style="background:${cat.color}"></span>${cat.name}<span class="unit">${cat.unit}</span>`;
-    btn.onclick = () => startAdd(cat);
+    btn.className = 'cat-btn' + (cat.id === 'harmful' || cat.id === 'healthy_fats' ? ' limit' : '');
+    btn.innerHTML = `
+      <span class="dot" style="background:${cat.color}"></span>
+      ${cat.name}
+      <span class="unit">${cat.unit}</span>
+      <span class="arrow">›</span>`;
+    btn.onclick = () => openSubs(cat);
     grid.appendChild(btn);
   });
 }
 
-function startAdd(cat) {
-  pendingCategory = cat;
+function openSubs(parent) {
+  pendingPath = { parent, sub: null };
   pendingPortion = 1;
-  document.getElementById('stepperTitle').textContent = cat.name;
-  document.getElementById('stepperUnit').textContent = 'Единица: ' + cat.unit;
+  document.getElementById('stepperCard').style.display = 'none';
+  document.getElementById('subCard').style.display = 'block';
+  document.getElementById('subTitle').textContent = parent.name + ' — выбери подкатегорию';
+  const sg = document.getElementById('subGrid');
+  sg.innerHTML = '';
+  parent.subs.forEach(sub => {
+    const b = document.createElement('button');
+    b.className = 'sub-btn';
+    b.innerHTML = `<span class="dot" style="background:${sub.color}"></span>${sub.name}`;
+    b.onclick = () => openStepper(parent, sub);
+    sg.appendChild(b);
+  });
+  document.getElementById('subCard').scrollIntoView({behavior:'smooth'});
+}
+
+function backToParents() {
+  pendingPath = null;
+  document.getElementById('subCard').style.display = 'none';
+  document.getElementById('stepperCard').style.display = 'none';
+}
+
+function openStepper(parent, sub) {
+  pendingPath = { parent, sub };
+  pendingPortion = 1;
+  document.getElementById('stepperTitle').textContent = `${parent.name} → ${sub.name}`;
+  document.getElementById('stepperUnit').textContent = 'Единица: ' + parent.unit;
   document.getElementById('portionVal').textContent = '1';
   document.getElementById('stepperCard').style.display = 'block';
   document.getElementById('stepperCard').scrollIntoView({behavior:'smooth'});
@@ -277,21 +364,25 @@ function changePortion(delta) {
 }
 
 function cancelAdd() {
-  pendingCategory = null;
+  pendingPath = null;
+  document.getElementById('subCard').style.display = 'none';
   document.getElementById('stepperCard').style.display = 'none';
 }
 
 function confirmAdd() {
-  if (!pendingCategory) return;
+  if (!pendingPath) return;
+  const { parent, sub } = pendingPath;
+  const type = parent.id === 'harmful' || parent.id === 'healthy_fats' ? 'limit' : 'goal';
   entries.push({
-    id: Date.now().toString(),
+    id: Date.now().toString() + Math.random().toString(36).slice(2,6),
     date: new Date().toISOString(),
-    categoryId: pendingCategory.id,
-    type: pendingCategory.type,
+    parentId: parent.id,
+    subId: sub.id,
+    type: type,
     portions: pendingPortion
   });
   save();
-  toast(`Добавлено: ${pendingCategory.name} × ${pendingPortion}`);
+  toast(`Добавлено: ${sub.name} × ${pendingPortion}`);
   cancelAdd();
 }
 
@@ -312,11 +403,15 @@ function setWindow(days) {
 function renderOverview() {
   const we = getWindowEntries(currentWindow);
 
-  // Целевые: суммируем порции по категориям
+  // Суммы по родительским плиткам (только type=goal)
   const goalTotals = {};
   settings.goals.forEach(g => goalTotals[g.id] = 0);
-  we.filter(e => e.type === 'goal').forEach(e => {
-    if (goalTotals[e.categoryId] !== undefined) goalTotals[e.categoryId] += e.portions;
+  const subTotals = {};
+  we.forEach(e => {
+    if (e.type === 'goal' && goalTotals[e.parentId] !== undefined) {
+      goalTotals[e.parentId] += e.portions;
+      subTotals[e.subId] = (subTotals[e.subId] || 0) + e.portions;
+    }
   });
   const goalSum = Object.values(goalTotals).reduce((a, b) => a + b, 0);
 
@@ -335,15 +430,36 @@ function renderOverview() {
       <div class="bar-track">
         <div class="bar-fill" style="width:${Math.min(pct, 100)}%;background:${g.color}"></div>
       </div>`;
+    // подкатегории (детализация)
+    g.subs.forEach(sub => {
+      const sf = subTotals[sub.id] || 0;
+      if (sf > 0) {
+        const sp = fact > 0 ? (sf / fact) * 100 : 0;
+        row.innerHTML += `
+          <div class="sub-bar">
+            <div class="bar-label">
+              <span>${sub.name}</span>
+              <span>${sf} ${g.unit} (${sp.toFixed(0)}% от раздела)</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${Math.min(sp,100)}%;background:${sub.color}"></div>
+            </div>
+          </div>`;
+      }
+    });
     goalBars.appendChild(row);
   });
-  if (goalSum === 0) goalBars.innerHTML = '<div class="hint">Пока нет записей за это окно. Добавь еду на вкладке «Добавить».</div>';
+  if (goalSum === 0) goalBars.innerHTML = '<div class="hint">Пока нет записей за это окно.</div>';
 
-  // Лимиты: доля от общего объёма (goalSum + лимиты)
+  // Лимиты
   const limitTotals = {};
   settings.limits.forEach(l => limitTotals[l.id] = 0);
-  we.filter(e => e.type === 'limit').forEach(e => {
-    if (limitTotals[e.categoryId] !== undefined) limitTotals[e.categoryId] += e.portions;
+  const subLimitTotals = {};
+  we.forEach(e => {
+    if (e.type === 'limit' && limitTotals[e.parentId] !== undefined) {
+      limitTotals[e.parentId] += e.portions;
+      subLimitTotals[e.subId] = (subLimitTotals[e.subId] || 0) + e.portions;
+    }
   });
   const limitSum = Object.values(limitTotals).reduce((a, b) => a + b, 0);
   const totalAll = goalSum + limitSum;
@@ -364,12 +480,28 @@ function renderOverview() {
       <div class="bar-track">
         <div class="bar-fill ${over ? 'over' : ''}" style="width:${Math.min(pct, 100)}%;background:${l.color}"></div>
       </div>`;
+    l.subs.forEach(sub => {
+      const sf = subLimitTotals[sub.id] || 0;
+      if (sf > 0) {
+        const sp = fact > 0 ? (sf / fact) * 100 : 0;
+        row.innerHTML += `
+          <div class="sub-bar">
+            <div class="bar-label">
+              <span>${sub.name}</span>
+              <span>${sf} ${l.unit} (${sp.toFixed(0)}% от раздела)</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${Math.min(sp,100)}%;background:${sub.color}"></div>
+            </div>
+          </div>`;
+      }
+    });
     limitBars.appendChild(row);
   });
   if (totalAll === 0) limitBars.innerHTML = '<div class="hint">Нет данных.</div>';
 
-  // Рыба
-  const fishCount = we.filter(e => e.categoryId === 'fish').reduce((a, e) => a + e.portions, 0);
+  // Рыба (внутри белка)
+  const fishCount = we.filter(e => e.subId === 'fish').reduce((a, e) => a + e.portions, 0);
   document.getElementById('fishText').textContent = `${fishCount} / ${settings.fishTarget} порции за окно`;
   const dots = document.getElementById('fishDots');
   dots.innerHTML = '';
@@ -385,7 +517,7 @@ function renderOverview() {
     const fact = goalTotals[g.id] || 0;
     const pct = goalSum > 0 ? (fact / goalSum) * 100 : 0;
     if (goalSum > 0 && pct < g.target - 5) {
-      hints.push(`Мало «${g.name}»: ${pct.toFixed(0)}% вместо ${g.target}%. Добавь в следующий приём.`);
+      hints.push(`Мало «${g.name}»: ${pct.toFixed(0)}% вместо ${g.target}%.`);
     }
   });
   settings.limits.forEach(l => {
@@ -403,11 +535,15 @@ function renderOverview() {
 }
 
 // ============ ИСТОРИЯ ============
+function findCat(parentId, subId) {
+  const all = [...settings.goals, ...settings.limits];
+  const parent = all.find(c => c.id === parentId);
+  const sub = parent ? parent.subs.find(s => s.id === subId) : null;
+  return { parent, sub };
+}
+
 function renderHistory() {
   const list = document.getElementById('historyList');
-  const allCats = [...settings.goals, ...settings.limits, {id:'fish', name:'Рыба', unit:'ладонь', color:'#2196F3'}];
-  const catMap = {};
-  allCats.forEach(c => catMap[c.id] = c);
   const sorted = [...entries].sort((a, b) => new Date(b.date) - new Date(a.date));
   if (sorted.length === 0) {
     list.innerHTML = '<div class="hint">Записей пока нет.</div>';
@@ -415,13 +551,15 @@ function renderHistory() {
   }
   list.innerHTML = '';
   sorted.slice(0, 50).forEach(e => {
-    const cat = catMap[e.categoryId] || {name: e.categoryId, color:'#999'};
+    const { parent, sub } = findCat(e.parentId, e.subId);
+    const name = sub ? `${parent.name} → ${sub.name}` : (parent ? parent.name : e.subId);
+    const color = sub ? sub.color : (parent ? parent.color : '#999');
     const d = new Date(e.date);
     const dateStr = d.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}) + ' ' + d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
     const div = document.createElement('div');
     div.className = 'entry';
     div.innerHTML = `
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cat.color};margin-right:6px;"></span>${cat.name} × ${e.portions}</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;"></span>${name} × ${e.portions}</span>
       <span style="color:var(--muted);font-size:12px;margin-left:auto;margin-right:8px;">${dateStr}</span>
       <button class="del" onclick="deleteEntry('${e.id}')">✕</button>`;
     list.appendChild(div);
@@ -486,17 +624,4 @@ function resetData() {
 }
 
 // ============ СЕРВИС ============
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
-}
-
-// ============ СТАРТ ============
-renderCatGrid();
-showScreen('add');
-</script>
-</body>
-</html>
+function
